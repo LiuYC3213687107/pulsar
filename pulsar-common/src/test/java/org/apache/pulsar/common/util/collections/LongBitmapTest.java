@@ -1051,4 +1051,20 @@ public class LongBitmapTest {
         assertEquals(bitmap.nextPresentValue(0xFFFFFFFFL), 0xFFFFFFFFL);
         assertEquals(bitmap.nextPresentValue(0x100000000L), -1);
     }
+
+    @Test
+    public void testPreviousAbsentDoesNotConfuseSentinelWithMaxUint32() {
+        // https://github.com/apache/pulsar/issues/27089
+        LongBitmap bitmap = LongBitmaps.create();
+        bitmap.add(0);
+        bitmap.add(0xFFFFFFFFL);
+
+        assertEquals(bitmap.previousAbsentValue(0), -1);
+        assertEquals(bitmap.previousAbsentValue(1), 1);
+        assertEquals(bitmap.previousAbsentValue(0xFFFFFFFFL), 0xFFFFFFFEL);
+
+        bitmap.add(1, 10);
+        assertEquals(bitmap.previousAbsentValue(9), -1);
+        assertEquals(bitmap.previousAbsentValue(10), 10);
+    }
 }

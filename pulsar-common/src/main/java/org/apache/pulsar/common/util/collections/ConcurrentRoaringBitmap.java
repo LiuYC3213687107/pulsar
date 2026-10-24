@@ -49,8 +49,9 @@ import org.roaringbitmap.RoaringBitmap;
  * {@link RoaringBitmap} is a single class implementing both {@code ImmutableBitmapDataProvider} and
  * {@code BitmapDataProvider}, so the type system does not separate readers from mutators here — the
  * split below is maintained by audit rather than by the compiler. Under the READ lock this class
- * calls only {@code contains(int)}, {@code contains(long, long)}, {@code getLongCardinality()},
- * {@code isEmpty()}, {@code rank(int)}, {@code nextValue(int)}, {@code previousValue(int)},
+ * calls only {@code contains(int)}, {@code contains(long, long)}, {@code rangeCardinality(long, long)},
+ * {@code getLongCardinality()}, {@code isEmpty()}, {@code rank(int)}, {@code nextValue(int)},
+ * {@code previousValue(int)},
  * {@code nextAbsentValue(int)}, {@code previousAbsentValue(int)}, {@code serializedSizeInBytes()},
  * {@code clone()} and {@link BitSetUtil#toLongArray(RoaringBitmap)}; each was verified to read
  * {@code highLowContainer} and its containers without writing to either. Everything that mutates —
@@ -298,6 +299,12 @@ class ConcurrentRoaringBitmap implements LongBitmap {
         }
         long stamp = lock.readLock();
         try {
+            // RoaringBitmap signals "none" with -1, which (int) aliases to MAX_UINT32, so its
+            // internal assertion fails when MAX_UINT32 is present. Answer that case here.
+            if (bitmap.contains((int) MAX_UINT32) && bitmap.contains(0)
+                    && bitmap.rangeCardinality(0, from + 1) == from + 1) {
+                return -1;
+            }
             return bitmap.previousAbsentValue((int) from);
         } finally {
             lock.unlockRead(stamp);
