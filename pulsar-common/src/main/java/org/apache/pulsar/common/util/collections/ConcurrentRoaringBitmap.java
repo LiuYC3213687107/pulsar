@@ -49,7 +49,7 @@ import org.roaringbitmap.RoaringBitmap;
  * {@link RoaringBitmap} is a single class implementing both {@code ImmutableBitmapDataProvider} and
  * {@code BitmapDataProvider}, so the type system does not separate readers from mutators here — the
  * split below is maintained by audit rather than by the compiler. Under the READ lock this class
- * calls only {@code contains(int)}, {@code contains(long, long)}, {@code getLongCardinality()},
+ * calls only {@code contains(int)}, {@code rangeCardinality(long, long)}, {@code getLongCardinality()},
  * {@code isEmpty()}, {@code rank(int)}, {@code nextValue(int)}, {@code previousValue(int)},
  * {@code nextAbsentValue(int)}, {@code previousAbsentValue(int)}, {@code serializedSizeInBytes()},
  * {@code clone()} and {@link BitSetUtil#toLongArray(RoaringBitmap)}; each was verified to read
@@ -221,7 +221,9 @@ class ConcurrentRoaringBitmap implements LongBitmap {
         }
         long stamp = lock.readLock();
         try {
-            return bitmap.contains(from, to);
+            // RoaringBitmap.contains(long, long) does not check the container holding `to - 1`
+            // when that container is missing, and mishandles to == UINT32_SIZE, so count instead.
+            return bitmap.rangeCardinality(from, to) == to - from;
         } finally {
             lock.unlockRead(stamp);
         }
